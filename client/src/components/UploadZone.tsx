@@ -3,10 +3,11 @@ import { Upload, ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface UploadZoneProps {
-  onFileSelect: (file: File) => void;
+  onFilesSelect: (files: File[]) => void;
+  maxFiles?: number;
 }
 
-export default function UploadZone({ onFileSelect }: UploadZoneProps) {
+export default function UploadZone({ onFilesSelect, maxFiles = 40 }: UploadZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -24,17 +25,20 @@ export default function UploadZone({ onFileSelect }: UploadZoneProps) {
     setIsDragging(false);
     
     const files = Array.from(e.dataTransfer.files);
-    const imageFile = files.find(file => file.type.startsWith('image/'));
+    const imageFiles = files.filter(file => file.type.startsWith('image/')).slice(0, maxFiles);
     
-    if (imageFile) {
-      onFileSelect(imageFile);
+    if (imageFiles.length > 0) {
+      onFilesSelect(imageFiles);
     }
   };
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      onFileSelect(file);
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      const imageFiles = Array.from(files).filter(file => file.type.startsWith('image/')).slice(0, maxFiles);
+      if (imageFiles.length > 0) {
+        onFilesSelect(imageFiles);
+      }
     }
   };
 
@@ -60,10 +64,13 @@ export default function UploadZone({ onFileSelect }: UploadZoneProps) {
         
         <div className="text-center space-y-2">
           <h3 className="text-xl font-semibold text-foreground">
-            اسحب الصورة هنا أو انقر للاختيار
+            اسحب الصور هنا أو انقر للاختيار
           </h3>
           <p className="text-sm text-muted-foreground">
-            يدعم JPG, PNG - حد أقصى 10 ميجابايت
+            يدعم JPG, PNG - حد أقصى {maxFiles} صورة
+          </p>
+          <p className="text-xs text-muted-foreground">
+            حجم الملف الواحد: حد أقصى 10 ميجابايت
           </p>
         </div>
 
@@ -73,6 +80,7 @@ export default function UploadZone({ onFileSelect }: UploadZoneProps) {
           accept="image/jpeg,image/png,image/jpg"
           onChange={handleFileInput}
           className="hidden"
+          multiple
           data-testid="input-file"
         />
       </div>
@@ -85,7 +93,7 @@ export default function UploadZone({ onFileSelect }: UploadZoneProps) {
           data-testid="button-choose-file"
         >
           <ImageIcon className="w-5 h-5 ml-2" />
-          اختر ملف
+          اختر صور متعددة
         </Button>
       </div>
     </div>

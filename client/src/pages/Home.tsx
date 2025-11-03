@@ -1,91 +1,137 @@
 import { useState } from "react";
 import Header from "@/components/Header";
 import UploadZone from "@/components/UploadZone";
-import ImagePreview from "@/components/ImagePreview";
-import ProcessingStatus from "@/components/ProcessingStatus";
+import ImageGallery, { ImageFile } from "@/components/ImageGallery";
+import BatchProcessingStatus from "@/components/BatchProcessingStatus";
 import DataTable, { DataRow } from "@/components/DataTable";
 import StatsCards from "@/components/StatsCards";
 import ActionButtons from "@/components/ActionButtons";
 import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import { Play } from "lucide-react";
 
 type AppState = 'upload' | 'preview' | 'processing' | 'results';
 
 export default function Home() {
   const [state, setState] = useState<AppState>('upload');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [imageUrl, setImageUrl] = useState<string>("");
-  const [progress, setProgress] = useState(0);
-  const [currentStep, setCurrentStep] = useState("");
+  const [images, setImages] = useState<ImageFile[]>([]);
+  const [processedImages, setProcessedImages] = useState(0);
+  const [successfulImages, setSuccessfulImages] = useState(0);
+  const [errorImages, setErrorImages] = useState(0);
+  const [currentImage, setCurrentImage] = useState<string>("");
   const [data, setData] = useState<DataRow[]>([]);
   const { toast } = useToast();
 
-  const handleFileSelect = (file: File) => {
-    setSelectedFile(file);
-    const url = URL.createObjectURL(file);
-    setImageUrl(url);
+  const handleFilesSelect = (files: File[]) => {
+    const newImages: ImageFile[] = files.map((file, index) => ({
+      id: `${Date.now()}-${index}`,
+      file,
+      url: URL.createObjectURL(file),
+      status: 'pending' as const,
+    }));
+
+    setImages(prev => [...prev, ...newImages].slice(0, 40));
     setState('preview');
     
     toast({
-      title: "تم رفع الملف بنجاح",
-      description: `الملف: ${file.name}`,
+      title: "تم رفع الصور بنجاح",
+      description: `تم إضافة ${files.length} صورة`,
     });
   };
 
-  const handleRemove = () => {
-    if (imageUrl) {
-      URL.revokeObjectURL(imageUrl);
+  const handleRemoveImage = (id: string) => {
+    const image = images.find(img => img.id === id);
+    if (image) {
+      URL.revokeObjectURL(image.url);
     }
-    setSelectedFile(null);
-    setImageUrl("");
+    setImages(prev => prev.filter(img => img.id !== id));
+    
+    if (images.length === 1) {
+      setState('upload');
+    }
+  };
+
+  const handleRemoveAll = () => {
+    images.forEach(img => URL.revokeObjectURL(img.url));
+    setImages([]);
     setState('upload');
   };
 
-  const handleReplace = () => {
-    if (imageUrl) {
-      URL.revokeObjectURL(imageUrl);
-    }
-    setSelectedFile(null);
-    setImageUrl("");
-    setState('upload');
-  };
-
-  const handleProcess = () => {
+  const handleProcess = async () => {
     setState('processing');
-    setProgress(0);
+    setProcessedImages(0);
+    setSuccessfulImages(0);
+    setErrorImages(0);
     
-    // Simulate processing steps
-    const steps = [
-      { step: "تحليل الصورة", progress: 33 },
-      { step: "استخراج النصوص العربية", progress: 66 },
-      { step: "تحديد الأسماء والأرقام القومية", progress: 100 },
-    ];
-
-    let currentStepIndex = 0;
+    const allData: DataRow[] = [];
     
-    const interval = setInterval(() => {
-      if (currentStepIndex < steps.length) {
-        setCurrentStep(steps[currentStepIndex].step);
-        setProgress(steps[currentStepIndex].progress);
-        currentStepIndex++;
-      } else {
-        clearInterval(interval);
-        // Simulate extracted data
-        const mockData: DataRow[] = [
-          { id: '1', name: 'أحمد محمد علي حسن', nationalId: '29012011234567' },
-          { id: '2', name: 'فاطمة حسن عبدالله محمود', nationalId: '28511981234568' },
-          { id: '3', name: 'محمود سعيد إبراهيم أحمد', nationalId: '30105951234569' },
-          { id: '4', name: 'نور الدين عمر خالد', nationalId: '29703001234570' },
-          { id: '5', name: 'ليلى يوسف منصور', nationalId: '28209921234571' },
-        ];
-        setData(mockData);
-        setState('results');
+    // Simulate processing each image
+    for (let i = 0; i < images.length; i++) {
+      const image = images[i];
+      setCurrentImage(image.file.name);
+      
+      // Update image status to processing
+      setImages(prev => prev.map(img => 
+        img.id === image.id ? { ...img, status: 'processing' as const } : img
+      ));
+      
+      // Simulate processing delay
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      // Simulate success/error randomly (90% success rate)
+      const isSuccess = Math.random() > 0.1;
+      
+      if (isSuccess) {
+        // Generate mock data for this image (2-5 records per image)
+        const recordCount = Math.floor(Math.random() * 4) + 2;
+        for (let j = 0; j < recordCount; j++) {
+          const mockNames = [
+            'أحمد محمد علي حسن',
+            'فاطمة حسن عبدالله محمود',
+            'محمود سعيد إبراهيم أحمد',
+            'نور الدين عمر خالد',
+            'ليلى يوسف منصور',
+            'خالد أحمد عبدالرحمن',
+            'سارة علي محمد',
+            'عمر حسين إبراهيم',
+            'منى عبدالله سعيد',
+            'يوسف محمد حسن'
+          ];
+          
+          const randomName = mockNames[Math.floor(Math.random() * mockNames.length)];
+          const randomId = `${20 + Math.floor(Math.random() * 10)}${String(Math.floor(Math.random() * 12) + 1).padStart(2, '0')}${String(Math.floor(Math.random() * 28) + 1).padStart(2, '0')}${String(Math.floor(Math.random() * 100)).padStart(2, '0')}1234${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`;
+          
+          allData.push({
+            id: `${image.id}-${j}`,
+            name: randomName,
+            nationalId: randomId,
+          });
+        }
         
-        toast({
-          title: "تمت المعالجة بنجاح!",
-          description: `تم استخراج ${mockData.length} سجلات`,
-        });
+        setImages(prev => prev.map(img => 
+          img.id === image.id ? { ...img, status: 'completed' as const } : img
+        ));
+        setSuccessfulImages(prev => prev + 1);
+      } else {
+        setImages(prev => prev.map(img => 
+          img.id === image.id ? { ...img, status: 'error' as const } : img
+        ));
+        setErrorImages(prev => prev + 1);
       }
-    }, 1500);
+      
+      setProcessedImages(prev => prev + 1);
+    }
+    
+    // Wait a bit before showing results
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    setData(allData);
+    setState('results');
+    
+    toast({
+      title: "اكتملت المعالجة!",
+      description: `تم استخراج ${allData.length} سجل من ${successfulImages + 1} صورة`,
+    });
   };
 
   const handleEdit = (id: string, name: string, nationalId: string) => {
@@ -126,12 +172,22 @@ export default function Home() {
   };
 
   const handleAddAnother = () => {
-    handleRemove();
-    setData([]);
+    // Keep existing images, just go back to upload to add more
+    if (images.length < 40) {
+      setState('upload');
+    } else {
+      toast({
+        title: "تنبيه",
+        description: "لقد وصلت للحد الأقصى من الصور (40 صورة)",
+        variant: "destructive",
+      });
+    }
   };
 
-  const formatFileSize = (bytes: number): string => {
-    return `${(bytes / (1024 * 1024)).toFixed(2)} ميجابايت`;
+  const handleReset = () => {
+    handleRemoveAll();
+    setData([]);
+    setState('upload');
   };
 
   return (
@@ -144,55 +200,75 @@ export default function Home() {
             <section className="py-12">
               <div className="text-center mb-8">
                 <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-                  قم برفع صورة الورقة المكتوبة بخط اليد
+                  قم برفع صور الأوراق المكتوبة بخط اليد
                 </h2>
                 <p className="text-base text-muted-foreground leading-relaxed max-w-2xl mx-auto">
-                  سنقوم باستخدام الذكاء الاصطناعي من Google Gemini لاستخراج الأسماء والأرقام القومية من الصورة وحفظها في Google Sheets
+                  سنقوم باستخدام الذكاء الاصطناعي من Google Gemini لاستخراج الأسماء والأرقام القومية من الصور وحفظها في Google Sheets
+                </p>
+                <p className="text-sm text-primary font-medium mt-2">
+                  يمكنك رفع حتى 40 صورة في المرة الواحدة
                 </p>
               </div>
-              <UploadZone onFileSelect={handleFileSelect} />
+              <UploadZone onFilesSelect={handleFilesSelect} maxFiles={40} />
             </section>
           )}
 
-          {state === 'preview' && selectedFile && (
+          {state === 'preview' && images.length > 0 && (
             <section className="py-12 space-y-8">
               <div className="text-center">
                 <h2 className="text-2xl font-semibold text-foreground mb-2">
-                  معاينة الصورة
+                  معاينة الصور ({images.length})
                 </h2>
                 <p className="text-sm text-muted-foreground">
-                  تأكد من وضوح الصورة قبل المعالجة
+                  تأكد من وضوح جميع الصور قبل بدء المعالجة
                 </p>
               </div>
               
-              <ImagePreview
-                imageUrl={imageUrl}
-                fileName={selectedFile.name}
-                fileSize={formatFileSize(selectedFile.size)}
-                dimensions="—"
-                onRemove={handleRemove}
-                onReplace={handleReplace}
+              <ImageGallery
+                images={images}
+                onRemove={handleRemoveImage}
+                onRemoveAll={handleRemoveAll}
               />
               
-              <div className="flex justify-center">
-                <ActionButtons
-                  onCreateSheet={handleProcess}
-                  onDownloadExcel={handleProcess}
-                  onAddAnother={handleAddAnother}
-                  disabled={false}
-                />
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                <Button
+                  size="lg"
+                  onClick={handleProcess}
+                  className="min-w-64"
+                  data-testid="button-start-processing"
+                >
+                  <Play className="w-5 h-5 ml-2" />
+                  بدء معالجة {images.length} صورة
+                </Button>
+                
+                {images.length < 40 && (
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    onClick={() => setState('upload')}
+                    data-testid="button-add-more"
+                  >
+                    إضافة المزيد من الصور ({40 - images.length} متبقية)
+                  </Button>
+                )}
               </div>
             </section>
           )}
 
           {state === 'processing' && (
             <section className="py-12 space-y-8">
-              <ProcessingStatus
-                status="processing"
-                progress={progress}
-                currentStep={currentStep}
-                currentStepNumber={Math.floor(progress / 33) + 1}
-                totalSteps={3}
+              <ImageGallery
+                images={images}
+                onRemove={() => {}}
+                onRemoveAll={() => {}}
+              />
+              
+              <BatchProcessingStatus
+                totalImages={images.length}
+                processedImages={processedImages}
+                successfulImages={successfulImages}
+                errorImages={errorImages}
+                currentImage={currentImage}
               />
             </section>
           )}
@@ -211,7 +287,7 @@ export default function Home() {
               <StatsCards
                 totalRecords={data.length}
                 successfulRecords={data.length}
-                errorRecords={0}
+                errorRecords={errorImages}
               />
 
               <DataTable
@@ -223,7 +299,7 @@ export default function Home() {
               <ActionButtons
                 onCreateSheet={handleCreateSheet}
                 onDownloadExcel={handleDownloadExcel}
-                onAddAnother={handleAddAnother}
+                onAddAnother={handleReset}
                 disabled={data.length === 0}
               />
             </section>

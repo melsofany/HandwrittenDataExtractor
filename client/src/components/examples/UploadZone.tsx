@@ -1,9 +1,9 @@
 import UploadZone from '../UploadZone'
 
 export default function UploadZoneExample() {
-  const handleFileSelect = (file: File) => {
-    console.log('File selected:', file.name);
+  const handleFilesSelect = (files: File[]) => {
+    console.log('Files selected:', files.map(f => f.name));
   };
 
-  return <UploadZone onFileSelect={handleFileSelect} />
+  return <UploadZone onFilesSelect={handleFilesSelect} maxFiles={40} />
 }
