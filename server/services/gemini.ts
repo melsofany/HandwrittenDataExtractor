@@ -11,7 +11,8 @@ const genAI = new GoogleGenerativeAI(apiKey);
 
 export async function extractDataFromImage(
   imageBase64: string,
-  fileName: string
+  fileName: string,
+  mimeType: string = "image/jpeg"
 ): Promise<ExtractedRecord[]> {
   try {
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
@@ -37,7 +38,7 @@ export async function extractDataFromImage(
     const imagePart = {
       inlineData: {
         data: imageBase64,
-        mimeType: "image/jpeg",
+        mimeType,
       },
     };
 

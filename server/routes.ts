@@ -10,6 +10,14 @@ const upload = multer({
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB max
   },
+  fileFilter: (req, file, cb) => {
+    // Accept only JPEG and PNG images
+    if (file.mimetype === 'image/jpeg' || file.mimetype === 'image/png') {
+      cb(null, true);
+    } else {
+      cb(new Error('يُسمح فقط بملفات JPEG و PNG'));
+    }
+  },
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -26,9 +34,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Convert buffer to base64
       const imageBase64 = req.file.buffer.toString('base64');
       const fileName = req.file.originalname;
+      const mimeType = req.file.mimetype;
 
       // Extract data using Gemini
-      const records = await extractDataFromImage(imageBase64, fileName);
+      const records = await extractDataFromImage(imageBase64, fileName, mimeType);
 
       res.json({
         success: true,
@@ -62,7 +71,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const file of files) {
         try {
           const imageBase64 = file.buffer.toString('base64');
-          const records = await extractDataFromImage(imageBase64, file.originalname);
+          const records = await extractDataFromImage(imageBase64, file.originalname, file.mimetype);
           
           allRecords.push(...records);
           results.push({

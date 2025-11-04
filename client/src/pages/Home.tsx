@@ -6,11 +6,13 @@ import BatchProcessingStatus from "@/components/BatchProcessingStatus";
 import DataTable, { DataRow } from "@/components/DataTable";
 import StatsCards from "@/components/StatsCards";
 import ActionButtons from "@/components/ActionButtons";
+import SheetSuccessCard from "@/components/SheetSuccessCard";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Play } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
 
-type AppState = 'upload' | 'preview' | 'processing' | 'results';
+type AppState = 'upload' | 'preview' | 'processing' | 'results' | 'sheet-created';
 
 export default function Home() {
   const [state, setState] = useState<AppState>('upload');
@@ -20,6 +22,8 @@ export default function Home() {
   const [errorImages, setErrorImages] = useState(0);
   const [currentImage, setCurrentImage] = useState<string>("");
   const [data, setData] = useState<DataRow[]>([]);
+  const [sheetUrl, setSheetUrl] = useState<string>("");
+  const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
 
   const handleFilesSelect = (files: File[]) => {
@@ -59,79 +63,77 @@ export default function Home() {
 
   const handleProcess = async () => {
     setState('processing');
+    setIsProcessing(true);
     setProcessedImages(0);
     setSuccessfulImages(0);
     setErrorImages(0);
     
     const allData: DataRow[] = [];
     
-    // Simulate processing each image
-    for (let i = 0; i < images.length; i++) {
-      const image = images[i];
-      setCurrentImage(image.file.name);
-      
-      // Update image status to processing
-      setImages(prev => prev.map(img => 
-        img.id === image.id ? { ...img, status: 'processing' as const } : img
-      ));
-      
-      // Simulate processing delay
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      // Simulate success/error randomly (90% success rate)
-      const isSuccess = Math.random() > 0.1;
-      
-      if (isSuccess) {
-        // Generate mock data for this image (2-5 records per image)
-        const recordCount = Math.floor(Math.random() * 4) + 2;
-        for (let j = 0; j < recordCount; j++) {
-          const mockNames = [
-            'أحمد محمد علي حسن',
-            'فاطمة حسن عبدالله محمود',
-            'محمود سعيد إبراهيم أحمد',
-            'نور الدين عمر خالد',
-            'ليلى يوسف منصور',
-            'خالد أحمد عبدالرحمن',
-            'سارة علي محمد',
-            'عمر حسين إبراهيم',
-            'منى عبدالله سعيد',
-            'يوسف محمد حسن'
-          ];
+    try {
+      // Process each image
+      for (let i = 0; i < images.length; i++) {
+        const image = images[i];
+        setCurrentImage(image.file.name);
+        
+        // Update image status to processing
+        setImages(prev => prev.map(img => 
+          img.id === image.id ? { ...img, status: 'processing' as const } : img
+        ));
+        
+        try {
+          // Create FormData for file upload
+          const formData = new FormData();
+          formData.append('image', image.file);
           
-          const randomName = mockNames[Math.floor(Math.random() * mockNames.length)];
-          const randomId = `${20 + Math.floor(Math.random() * 10)}${String(Math.floor(Math.random() * 12) + 1).padStart(2, '0')}${String(Math.floor(Math.random() * 28) + 1).padStart(2, '0')}${String(Math.floor(Math.random() * 100)).padStart(2, '0')}1234${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`;
-          
-          allData.push({
-            id: `${image.id}-${j}`,
-            name: randomName,
-            nationalId: randomId,
+          // Send to API
+          const response = await fetch('/api/process-image', {
+            method: 'POST',
+            body: formData,
           });
+          
+          const result = await response.json();
+          
+          if (result.success && result.records) {
+            // Add records to our data
+            allData.push(...result.records);
+            
+            setImages(prev => prev.map(img => 
+              img.id === image.id ? { ...img, status: 'completed' as const } : img
+            ));
+            setSuccessfulImages(prev => prev + 1);
+          } else {
+            throw new Error(result.error || 'فشل في معالجة الصورة');
+          }
+        } catch (error) {
+          console.error(`Error processing ${image.file.name}:`, error);
+          setImages(prev => prev.map(img => 
+            img.id === image.id ? { ...img, status: 'error' as const } : img
+          ));
+          setErrorImages(prev => prev + 1);
         }
         
-        setImages(prev => prev.map(img => 
-          img.id === image.id ? { ...img, status: 'completed' as const } : img
-        ));
-        setSuccessfulImages(prev => prev + 1);
-      } else {
-        setImages(prev => prev.map(img => 
-          img.id === image.id ? { ...img, status: 'error' as const } : img
-        ));
-        setErrorImages(prev => prev + 1);
+        setProcessedImages(prev => prev + 1);
       }
       
-      setProcessedImages(prev => prev + 1);
+      setData(allData);
+      setState('results');
+      
+      toast({
+        title: "اكتملت المعالجة!",
+        description: `تم استخراج ${allData.length} سجل من ${successfulImages} صورة`,
+      });
+    } catch (error) {
+      console.error("Error in batch processing:", error);
+      toast({
+        title: "خطأ في المعالجة",
+        description: error instanceof Error ? error.message : "حدث خطأ غير متوقع",
+        variant: "destructive",
+      });
+      setState('preview');
+    } finally {
+      setIsProcessing(false);
     }
-    
-    // Wait a bit before showing results
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    setData(allData);
-    setState('results');
-    
-    toast({
-      title: "اكتملت المعالجة!",
-      description: `تم استخراج ${allData.length} سجل من ${successfulImages + 1} صورة`,
-    });
   };
 
   const handleEdit = (id: string, name: string, nationalId: string) => {
@@ -155,24 +157,55 @@ export default function Home() {
     });
   };
 
-  const handleCreateSheet = () => {
-    toast({
-      title: "جاري الإنشاء...",
-      description: "سيتم إنشاء ملف Google Sheets جديد",
-    });
-    console.log('Creating Google Sheet with data:', data);
+  const handleCreateSheet = async () => {
+    try {
+      toast({
+        title: "جاري الإنشاء...",
+        description: "يرجى الانتظار، جاري إنشاء ملف Google Sheets",
+      });
+
+      const response = await apiRequest('/api/create-sheet', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          records: data,
+          sheetName: `بيانات مستخرجة - ${new Date().toLocaleDateString('ar-EG')}`,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success && result.sheetUrl) {
+        setSheetUrl(result.sheetUrl);
+        setState('sheet-created');
+        
+        toast({
+          title: "تم الإنشاء بنجاح!",
+          description: "تم إنشاء ملف Google Sheets وحفظ البيانات",
+        });
+      } else {
+        throw new Error(result.error || 'فشل في إنشاء Google Sheet');
+      }
+    } catch (error) {
+      console.error("Error creating sheet:", error);
+      toast({
+        title: "خطأ في الإنشاء",
+        description: error instanceof Error ? error.message : "فشل في إنشاء Google Sheet",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleDownloadExcel = () => {
     toast({
-      title: "جاري التنزيل...",
-      description: "سيتم تنزيل الملف قريباً",
+      title: "قريباً",
+      description: "ميزة التنزيل كـ Excel ستكون متاحة قريباً",
     });
-    console.log('Downloading Excel with data:', data);
   };
 
   const handleAddAnother = () => {
-    // Keep existing images, just go back to upload to add more
     if (images.length < 40) {
       setState('upload');
     } else {
@@ -187,6 +220,7 @@ export default function Home() {
   const handleReset = () => {
     handleRemoveAll();
     setData([]);
+    setSheetUrl("");
     setState('upload');
   };
 
@@ -234,6 +268,7 @@ export default function Home() {
                 <Button
                   size="lg"
                   onClick={handleProcess}
+                  disabled={isProcessing}
                   className="min-w-64"
                   data-testid="button-start-processing"
                 >
@@ -302,6 +337,26 @@ export default function Home() {
                 onAddAnother={handleReset}
                 disabled={data.length === 0}
               />
+            </section>
+          )}
+
+          {state === 'sheet-created' && (
+            <section className="py-12 space-y-8">
+              <SheetSuccessCard
+                sheetUrl={sheetUrl}
+                recordCount={data.length}
+              />
+              
+              <div className="flex justify-center">
+                <Button
+                  variant="outline"
+                  size="lg"
+                  onClick={handleReset}
+                  data-testid="button-start-new"
+                >
+                  بدء عملية جديدة
+                </Button>
+              </div>
             </section>
           )}
         </div>
