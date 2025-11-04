@@ -1,18 +1,41 @@
-import { sql } from "drizzle-orm";
-import { pgTable, text, varchar } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+export const extractedRecordSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  nationalId: z.string(),
+  sourceImageId: z.string().optional(),
 });
 
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
+export type ExtractedRecord = z.infer<typeof extractedRecordSchema>;
+
+export const processImageRequestSchema = z.object({
+  imageData: z.string(),
+  fileName: z.string(),
 });
 
-export type InsertUser = z.infer<typeof insertUserSchema>;
-export type User = typeof users.$inferSelect;
+export type ProcessImageRequest = z.infer<typeof processImageRequestSchema>;
+
+export const processImageResponseSchema = z.object({
+  success: z.boolean(),
+  records: z.array(extractedRecordSchema),
+  error: z.string().optional(),
+});
+
+export type ProcessImageResponse = z.infer<typeof processImageResponseSchema>;
+
+export const createSheetRequestSchema = z.object({
+  records: z.array(extractedRecordSchema),
+  sheetName: z.string().optional(),
+});
+
+export type CreateSheetRequest = z.infer<typeof createSheetRequestSchema>;
+
+export const createSheetResponseSchema = z.object({
+  success: z.boolean(),
+  sheetUrl: z.string().optional(),
+  sheetId: z.string().optional(),
+  error: z.string().optional(),
+});
+
+export type CreateSheetResponse = z.infer<typeof createSheetResponseSchema>;
