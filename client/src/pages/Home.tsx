@@ -9,10 +9,10 @@ import ActionButtons from "@/components/ActionButtons";
 import SheetSuccessCard from "@/components/SheetSuccessCard";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { Play } from "lucide-react";
+import { Play, Pencil } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 
-type AppState = 'upload' | 'preview' | 'processing' | 'results' | 'sheet-created';
+type AppState = 'upload' | 'preview' | 'processing' | 'edit' | 'results' | 'sheet-created';
 
 export default function Home() {
   const [state, setState] = useState<AppState>('upload');
@@ -136,11 +136,11 @@ export default function Home() {
       }
       
       setData(allData);
-      setState('results');
+      setState('edit');
       
       toast({
         title: "اكتملت المعالجة!",
-        description: `تم استخراج ${allData.length} سجل من ${successfulImages} صورة`,
+        description: `تم استخراج ${allData.length} سجل. يرجى مراجعة البيانات للتأكد من دقتها`,
       });
     } catch (error) {
       console.error("Error in batch processing:", error);
@@ -155,9 +155,23 @@ export default function Home() {
     }
   };
 
+  const normalizeArabicNumbers = (text: string): string => {
+    const arabicToEnglish: { [key: string]: string } = {
+      '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4',
+      '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9'
+    };
+    return text.replace(/[٠-٩]/g, (match) => arabicToEnglish[match] || match);
+  };
+
+  const cleanNationalId = (nationalId: string): string => {
+    let cleaned = normalizeArabicNumbers(nationalId);
+    cleaned = cleaned.replace(/[^\d]/g, '');
+    return cleaned;
+  };
+
   const handleEdit = (id: string, name: string, nationalId: string) => {
     setData(prev => prev.map(item => 
-      item.id === id ? { ...item, name, nationalId } : item
+      item.id === id ? { ...item, name: name.trim(), nationalId: cleanNationalId(nationalId) } : item
     ));
     
     toast({
@@ -365,6 +379,59 @@ export default function Home() {
                 errorImages={errorImages}
                 currentImage={currentImage}
               />
+            </section>
+          )}
+
+          {state === 'edit' && (
+            <section className="py-12 space-y-8">
+              <div className="text-center space-y-4">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-2">
+                  <Pencil className="w-8 h-8 text-primary" />
+                </div>
+                <h2 className="text-3xl font-bold text-foreground">
+                  مراجعة وتحرير البيانات
+                </h2>
+                <p className="text-base text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+                  تم استخراج <span className="font-bold text-primary">{data.length}</span> سجل من الصور.
+                  <br />
+                  <span className="text-amber-600 dark:text-amber-400 font-medium">
+                    يرجى مراجعة البيانات بعناية والتأكد من دقتها قبل التصدير.
+                  </span>
+                  <br />
+                  انقر على أيقونة القلم لتعديل أي سجل، أو أيقونة سلة المهملات لحذفه.
+                </p>
+              </div>
+
+              <StatsCards
+                totalRecords={data.length}
+                successfulRecords={data.length}
+                errorRecords={errorImages}
+              />
+
+              <DataTable
+                data={data}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+              />
+
+              <div className="flex justify-center gap-4">
+                <Button
+                  size="lg"
+                  onClick={() => setState('results')}
+                  className="min-w-64"
+                  data-testid="button-confirm-data"
+                >
+                  تأكيد البيانات والمتابعة
+                </Button>
+                <Button
+                  variant="outline"
+                  size="lg"
+                  onClick={() => setState('preview')}
+                  data-testid="button-back-to-images"
+                >
+                  العودة للصور
+                </Button>
+              </div>
             </section>
           )}
 
