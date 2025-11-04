@@ -51,6 +51,42 @@ async function getUncachableGoogleSheetClient() {
   return google.sheets({ version: 'v4', auth: oauth2Client });
 }
 
+function extractSpreadsheetId(urlOrId: string): string {
+  const match = urlOrId.match(/\/d\/([a-zA-Z0-9-_]+)/);
+  return match ? match[1] : urlOrId;
+}
+
+export async function appendToGoogleSheet(
+  records: ExtractedRecord[],
+  spreadsheetUrlOrId: string
+): Promise<{ sheetUrl: string; sheetId: string }> {
+  try {
+    const sheets = await getUncachableGoogleSheetClient();
+    const spreadsheetId = extractSpreadsheetId(spreadsheetUrlOrId);
+    
+    const rows = records.map(record => [record.name, record.nationalId]);
+    
+    await sheets.spreadsheets.values.append({
+      spreadsheetId,
+      range: 'A:B',
+      valueInputOption: 'RAW',
+      requestBody: {
+        values: rows,
+      },
+    });
+
+    const sheetUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}`;
+    
+    return {
+      sheetUrl,
+      sheetId: spreadsheetId,
+    };
+  } catch (error) {
+    console.error('Error appending to Google Sheet:', error);
+    throw new Error(`فشل في الكتابة إلى Google Sheet: ${error instanceof Error ? error.message : 'خطأ غير معروف'}`);
+  }
+}
+
 export async function createGoogleSheet(
   records: ExtractedRecord[],
   sheetName?: string
@@ -58,7 +94,6 @@ export async function createGoogleSheet(
   try {
     const sheets = await getUncachableGoogleSheetClient();
     
-    // Create a new spreadsheet
     const title = sheetName || `بيانات مستخرجة - ${new Date().toLocaleDateString('ar-EG')}`;
     
     const createResponse = await sheets.spreadsheets.create({
@@ -85,12 +120,10 @@ export async function createGoogleSheet(
       throw new Error('Failed to create spreadsheet');
     }
 
-    // Prepare the data
     const headers = ['الاسم الكامل', 'الرقم القومي'];
     const rows = records.map(record => [record.name, record.nationalId]);
     const values = [headers, ...rows];
 
-    // Write data to the sheet
     await sheets.spreadsheets.values.update({
       spreadsheetId,
       range: 'البيانات المستخرجة!A1',
@@ -100,7 +133,6 @@ export async function createGoogleSheet(
       },
     });
 
-    // Format the header row
     await sheets.spreadsheets.batchUpdate({
       spreadsheetId,
       requestBody: {

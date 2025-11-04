@@ -198,6 +198,47 @@ export default function Home() {
     }
   };
 
+  const handleAppendToSheet = async (spreadsheetUrl: string) => {
+    try {
+      toast({
+        title: "جاري الإضافة...",
+        description: "يرجى الانتظار، جاري إضافة البيانات إلى الملف",
+      });
+
+      const response = await fetch('/api/append-to-sheet', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          records: data,
+          spreadsheetUrl,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success && result.sheetUrl) {
+        setSheetUrl(result.sheetUrl);
+        setState('sheet-created');
+        
+        toast({
+          title: "تم الإضافة بنجاح!",
+          description: `تم إضافة ${data.length} سجل إلى الملف`,
+        });
+      } else {
+        throw new Error(result.error || 'فشل في الإضافة إلى Google Sheet');
+      }
+    } catch (error) {
+      console.error("Error appending to sheet:", error);
+      toast({
+        title: "خطأ في الإضافة",
+        description: error instanceof Error ? error.message : "فشل في الإضافة إلى Google Sheet",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleDownloadExcel = () => {
     toast({
       title: "قريباً",
@@ -333,6 +374,7 @@ export default function Home() {
 
               <ActionButtons
                 onCreateSheet={handleCreateSheet}
+                onAppendToSheet={handleAppendToSheet}
                 onDownloadExcel={handleDownloadExcel}
                 onAddAnother={handleReset}
                 disabled={data.length === 0}

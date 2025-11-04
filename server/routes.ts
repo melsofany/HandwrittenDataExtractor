@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import multer from "multer";
 import { extractDataFromImage } from "./services/gemini";
-import { createGoogleSheet } from "./services/googleSheets";
+import { createGoogleSheet, appendToGoogleSheet } from "./services/googleSheets";
 import type { ExtractedRecord } from "@shared/schema";
 
 const upload = multer({
@@ -99,6 +99,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : "خطأ في معالجة الصور",
+      });
+    }
+  });
+
+  // Append to existing Google Sheet
+  app.post("/api/append-to-sheet", async (req, res) => {
+    try {
+      const { records, spreadsheetUrl } = req.body;
+
+      if (!records || !Array.isArray(records) || records.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: "لا توجد بيانات لحفظها",
+        });
+      }
+
+      if (!spreadsheetUrl) {
+        return res.status(400).json({
+          success: false,
+          error: "يجب تحديد رابط الشيت",
+        });
+      }
+
+      const result = await appendToGoogleSheet(records, spreadsheetUrl);
+
+      res.json({
+        success: true,
+        sheetUrl: result.sheetUrl,
+        sheetId: result.sheetId,
+      });
+    } catch (error) {
+      console.error("Error appending to Google Sheet:", error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : "خطأ في الكتابة إلى Google Sheet",
       });
     }
   });
