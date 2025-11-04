@@ -88,7 +88,7 @@ export default function Home() {
           
           // Send to API with timeout
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minutes timeout
+          const timeoutId = setTimeout(() => controller.abort(), 480000); // 8 minutes timeout
           
           const response = await fetch('/api/process-image', {
             method: 'POST',
