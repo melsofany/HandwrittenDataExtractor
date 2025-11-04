@@ -24,7 +24,7 @@ async function getAccessToken() {
     {
       headers: {
         'Accept': 'application/json',
-        'X-Replit-Token': xReplitToken
+        'X_REPLIT_TOKEN': xReplitToken
       }
     }
   ).then(res => res.json()).then(data => data.items?.[0]);
