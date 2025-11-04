@@ -168,5 +168,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   const httpServer = createServer(app);
 
+  httpServer.timeout = 600000;
+  httpServer.requestTimeout = 600000;
+  httpServer.headersTimeout = 610000;
+
   return httpServer;
 }
