@@ -30,7 +30,14 @@ export async function extractDataFromImage(
   mimeType: string = "image/jpeg"
 ): Promise<ExtractedRecord[]> {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    console.log(`Starting to process image: ${fileName}, size: ${imageBase64.length} bytes`);
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-2.5-flash",
+      generationConfig: {
+        temperature: 0.1,
+        maxOutputTokens: 8192,
+      },
+    });
 
     const prompt = `أنت خبير متخصص في قراءة الوثائق العربية المكتوبة بخط اليد بدقة عالية جداً. مهمتك هي استخراج الأسماء الكاملة والأرقام القومية من هذه الصورة بدقة 100%.
 
@@ -81,21 +88,31 @@ export async function extractDataFromImage(
       },
     };
 
+    console.log(`Sending request to Gemini API for ${fileName}...`);
     const result = await model.generateContent([prompt, imagePart]);
     const response = await result.response;
+    console.log(`Received response from Gemini API for ${fileName}`);
     const text = response.text();
 
     // Clean the response text
     let cleanText = text.trim();
+    console.log(`Response text length: ${cleanText.length} characters`);
     
     // Remove markdown code blocks if present
     cleanText = cleanText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
     
     // Try to parse the JSON response
-    const parsed = JSON.parse(cleanText);
+    let parsed;
+    try {
+      parsed = JSON.parse(cleanText);
+    } catch (jsonError) {
+      console.error(`JSON parse error for ${fileName}:`, jsonError);
+      console.error(`Raw response text: ${cleanText.substring(0, 500)}...`);
+      throw new Error("فشل في تحليل استجابة Gemini - الصورة قد تكون غير واضحة");
+    }
     
     if (!parsed.records || !Array.isArray(parsed.records)) {
-      console.error("Invalid response format from Gemini:", parsed);
+      console.error(`Invalid response format from Gemini for ${fileName}:`, parsed);
       return [];
     }
 
@@ -107,9 +124,13 @@ export async function extractDataFromImage(
       sourceImageId: fileName,
     }));
 
+    console.log(`Successfully extracted ${records.length} records from ${fileName}`);
     return records;
   } catch (error) {
-    console.error("Error extracting data from image:", error);
-    throw new Error(`فشل في معالجة الصورة: ${error instanceof Error ? error.message : "خطأ غير معروف"}`);
+    console.error(`Error extracting data from image ${fileName}:`, error);
+    if (error instanceof Error) {
+      console.error(`Error stack: ${error.stack}`);
+    }
+    throw new Error(`فشل في معالجة الصورة ${fileName}: ${error instanceof Error ? error.message : "خطأ غير معروف"}`);
   }
 }
