@@ -86,11 +86,21 @@ export default function Home() {
           const formData = new FormData();
           formData.append('image', image.file);
           
-          // Send to API
+          // Send to API with timeout
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minutes timeout
+          
           const response = await fetch('/api/process-image', {
             method: 'POST',
             body: formData,
+            signal: controller.signal,
           });
+          
+          clearTimeout(timeoutId);
+          
+          if (!response.ok) {
+            throw new Error(`خطأ في الخادم: ${response.status}`);
+          }
           
           const result = await response.json();
           
@@ -111,6 +121,15 @@ export default function Home() {
             img.id === image.id ? { ...img, status: 'error' as const } : img
           ));
           setErrorImages(prev => prev + 1);
+          
+          // If server disconnected, show specific error
+          if (error instanceof TypeError && error.message.includes('fetch')) {
+            toast({
+              title: "فقدان الاتصال",
+              description: "حدث انقطاع في الاتصال بالخادم. جاري المتابعة...",
+              variant: "destructive",
+            });
+          }
         }
         
         setProcessedImages(prev => prev + 1);
