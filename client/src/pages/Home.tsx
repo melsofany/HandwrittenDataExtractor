@@ -164,7 +164,7 @@ export default function Home() {
         description: "يرجى الانتظار، جاري إنشاء ملف Google Sheets",
       });
 
-      const response = await apiRequest('/api/create-sheet', {
+      const response = await fetch('/api/create-sheet', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
