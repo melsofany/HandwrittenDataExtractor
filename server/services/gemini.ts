@@ -15,7 +15,7 @@ export async function extractDataFromImage(
   mimeType: string = "image/jpeg"
 ): Promise<ExtractedRecord[]> {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
 
     const prompt = `أنت خبير في قراءة النصوص العربية المكتوبة بخط اليد. يرجى تحليل هذه الصورة واستخراج جميع الأسماء الكاملة والأرقام القومية (الرقم الوطني).
 
